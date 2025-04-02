@@ -1,10 +1,8 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from collections import Counter
 import time
 import re
+from collections import Counter
 
 # Set page configuration
 st.set_page_config(
@@ -26,13 +24,6 @@ st.markdown("""
         color: #666;
         margin-bottom: 2rem;
     }
-    .results-card {
-        background-color: #f9f9f9;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        margin-top: 20px;
-    }
     .highlight-text {
         background-color: #f0f7ff;
         padding: 10px;
@@ -40,26 +31,31 @@ st.markdown("""
         border-left: 3px solid #4c78a8;
         margin-bottom: 10px;
     }
-    .status-complete {
-        color: white;
-        background-color: #28a745;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 0.8rem;
+    .positive-metric {
+        color: #28a745;
+        font-weight: bold;
     }
-    .status-pending {
-        color: white;
-        background-color: #ffc107;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 0.8rem;
+    .negative-metric {
+        color: #dc3545;
+        font-weight: bold;
     }
-    .status-missing {
-        color: white;
-        background-color: #dc3545;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 0.8rem;
+    .comment-card {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+    .store-name {
+        font-weight: bold;
+        color: #333;
+    }
+    .store-code {
+        color: #666;
+        font-size: 0.9em;
+    }
+    .comment-text {
+        margin-top: 5px;
+        font-style: italic;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -135,17 +131,16 @@ if st.button("Ask", key="process_button") or query:
                     not_visited_count = len(not_visited)
                     visit_rate = ((total_stores - not_visited_count) / total_stores) * 100
                     
+                    # Create a two-column metric display
                     col1, col2 = st.columns(2)
                     with col1:
                         st.metric("Not Visited", f"{not_visited_count} of {total_stores}")
                     with col2:
                         st.metric("Completion Rate", f"{visit_rate:.1f}%")
-                        
-                    # Progress bar
-                    st.progress((total_stores - not_visited_count) / total_stores)
                     
                     # Display table of not visited stores
                     if not not_visited.empty:
+                        st.write(f"### {not_visited_count} Stores Awaiting Visits")
                         display_df = not_visited[["Site Code", "Site Name", "Status", "Banner Name"]].copy()
                         st.dataframe(display_df, use_container_width=True)
                     else:
@@ -168,22 +163,24 @@ if st.button("Ask", key="process_button") or query:
                     no_flyer_count = len(no_flyer)
                     flyer_rate = ((total_responses - no_flyer_count) / total_responses) * 100 if total_responses > 0 else 0
                     
+                    # Create a two-column metric display
                     col1, col2 = st.columns(2)
                     with col1:
                         st.metric("No Flyer", f"{no_flyer_count} of {total_responses}")
                     with col2:
                         st.metric("Flyer Availability Rate", f"{flyer_rate:.1f}%")
                     
-                    # Display chart
-                    flyer_counts = survey_data[flyer_col].value_counts()
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    flyer_counts.plot.pie(autopct='%1.1f%%', ax=ax)
-                    ax.set_title("Flyer Availability")
-                    ax.set_ylabel("")
-                    st.pyplot(fig)
+                    # Display summary text
+                    if flyer_rate >= 80:
+                        st.success(f"Flyer compliance is good at {flyer_rate:.1f}%")
+                    elif flyer_rate >= 50:
+                        st.warning(f"Flyer compliance is moderate at {flyer_rate:.1f}%")
+                    else:
+                        st.error(f"Flyer compliance is poor at {flyer_rate:.1f}%")
                     
                     # Display table of stores without flyers
                     if not no_flyer.empty:
+                        st.write(f"### {no_flyer_count} Stores Missing Flyers")
                         display_df = no_flyer[["Site Code", "Site Name", "Banner Name", "Status"]].copy()
                         st.dataframe(display_df, use_container_width=True)
                     else:
@@ -212,25 +209,30 @@ if st.button("Ask", key="process_button") or query:
                         all_comments = " ".join(flyer_comments[comment_col].fillna("").str.lower())
                         common_words = ["flyer", "not", "found", "store", "the", "and", "was", "for", "with", "have", "had"]
                         words = [word for word in re.findall(r'\b\w+\b', all_comments) if word not in common_words and len(word) > 3]
-                        word_counts = Counter(words).most_common(10)
+                        word_counts = Counter(words).most_common(5)
                         
                         if word_counts:
                             # Display common themes
                             st.subheader("Common Themes in Flyer Comments")
-                            theme_data = pd.DataFrame(word_counts, columns=["Term", "Frequency"])
+                            st.write("Most frequently mentioned terms:")
                             
-                            fig, ax = plt.subplots(figsize=(10, 6))
-                            sns.barplot(x="Frequency", y="Term", data=theme_data, ax=ax)
-                            ax.set_title("Frequently Mentioned Terms in Flyer Comments")
-                            st.pyplot(fig)
+                            # Create a horizontal bar representation with text
+                            for word, count in word_counts:
+                                # Calculate percentage
+                                percentage = (count / len(words)) * 100
+                                # Create a text-based bar
+                                bar_length = int(percentage / 2)  # Adjust for reasonable length
+                                bar = "█" * bar_length
+                                st.write(f"**{word}**: {count} mentions {bar} ({percentage:.1f}%)")
                         
                         # Display all comments
                         st.subheader("All Flyer Comments")
                         for _, row in flyer_comments.iterrows():
                             st.markdown(f"""
-                            <div class="highlight-text">
-                                <strong>{row['Site Name']} (Code: {row['Site Code']})</strong><br>
-                                {row[comment_col]}
+                            <div class="comment-card">
+                                <div class="store-name">{row['Site Name']}</div>
+                                <div class="store-code">Code: {row['Site Code']}</div>
+                                <div class="comment-text">{row[comment_col]}</div>
                             </div>
                             """, unsafe_allow_html=True)
                     else:
