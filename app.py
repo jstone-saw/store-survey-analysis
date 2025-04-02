@@ -1,17 +1,4 @@
-# Add this at the very top of your app.py file
 import streamlit as st
-import sys
-import subprocess
-
-# Install required packages
-required_packages = ['matplotlib', 'seaborn', 'pandas']
-for package in required_packages:
-    try:
-        __import__(package)
-    except ImportError:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-
-# Now import what you need from these packages
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
